@@ -118,7 +118,7 @@ class Plugin:
             if any(refresh % fps == 0 for refresh in refresh_rates)
         ]
 
-        result = [0, *available_fps]
+        result = available_fps
 
         decky.logger.info(
             f"[FPS DEBUG] refresh_rates={refresh_rates}, available_fps={result}"

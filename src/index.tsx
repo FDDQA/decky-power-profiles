@@ -242,6 +242,20 @@ void loadAvailableFps();
     UNKNOWN: "Failed to determine power source",
   }[powerStatus] ?? "Unknown state";
 
+  const maxAvailableFps = availableFps[availableFps.length - 1] ?? 0;
+
+  const displayedFpsAc = availableFps.includes(fpsAc)
+    ? fpsAc
+    : maxAvailableFps;
+
+  const displayedFpsBattery = availableFps.includes(fpsBattery)
+    ? fpsBattery
+    : maxAvailableFps;
+
+  const hasUnsupportedFps =
+    !availableFps.includes(fpsAc) ||
+    !availableFps.includes(fpsBattery);
+
   return (
     <PanelSection title="Power Profiles">
       {/* Power Source Status */}
@@ -347,12 +361,13 @@ void loadAvailableFps();
                       }}
                     />
                   </div>
+                  
 
                   {/* Sliders for FPS */}
                   <div style={{ marginTop: "12px" }}>
                     <SliderField
-                      label={`AC FPS: ${fpsAc === 0 ? "Unlimited" : fpsAc}`}
-                      value={Math.max(0, availableFps.indexOf(fpsAc))}
+                      label={`AC FPS: ${displayedFpsAc}`}
+                      value={Math.max(0, availableFps.indexOf(displayedFpsAc))}
                       min={0}
                       max={Math.max(0, availableFps.length - 1)}
                       step={1}
@@ -367,8 +382,8 @@ void loadAvailableFps();
 
                   <div style={{ marginTop: "12px" }}>
                     <SliderField
-                      label={`Battery FPS: ${fpsBattery === 0 ? "Unlimited" : fpsBattery}`}
-                      value={Math.max(0, availableFps.indexOf(fpsBattery))}
+                      label={`Battery FPS: ${displayedFpsBattery}`}
+                      value={Math.max(0, availableFps.indexOf(displayedFpsBattery))}
                       min={0}
                       max={Math.max(0, availableFps.length - 1)}
                       showValue={false}
@@ -379,6 +394,13 @@ void loadAvailableFps();
                       }}
                     />
                   </div>
+
+                  {hasUnsupportedFps && (
+                  <div style={{ marginTop: "8px", color: "#f0ad4e" }}>
+                    FPS limit was reset because the configured FPS is unavailable
+                    on this display. The maximum available FPS is selected.
+                  </div>
+)}
 
                   <button
                     style={{ marginTop: "12px" }}
@@ -412,30 +434,6 @@ void loadAvailableFps();
               Error: {tdpError}
             </div>
           )}
-      {/* TDP Limit Slider */}
-      {/* <PanelSectionRow>
-        <SliderField
-          label={`TDP: ${tdpLimit} watts`}
-          value={tdpLimit}
-          min={3}
-          max={15}
-          step={1}
-          showValue={true}
-          onChange={async (value) => {
-            const next = Math.round(value);
-
-            setTdpLimitState(next);
-
-            try {
-              await setTdpLimit(next);
-              setTdpError("");
-            } catch (error) {
-              setTdpError(String(error));
-              setTdpLimitState(await getTdpLimit());
-            }
-          }}
-        />
-      </PanelSectionRow> */}
         </div>
       </PanelSectionRow>
     </PanelSection>
