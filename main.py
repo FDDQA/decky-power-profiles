@@ -309,7 +309,13 @@ class Plugin:
             # FPS
             fps_key = "fps_ac" if power_status == "AC" else "fps_battery"
             target_fps = profile.get(fps_key, 0)
-            fps_profile_key = (app_id, power_status, target_fps)
+            available_fps = await self.get_available_fps()
+            fps_profile_key = (
+                app_id,
+                power_status,
+                target_fps,
+                tuple(available_fps),
+            )
 
             if (
                 fps_profile_key != self._active_fps_key
