@@ -11,8 +11,39 @@ import {
   definePlugin,
   toaster,
 } from "@decky/api"
-import { useEffect, useState } from "react";
+import { useEffect, useState} from "react";
 import { FaShip } from "react-icons/fa";
+
+// Extend Window interface to recognize Decky's backend bridge
+declare global {
+    interface Window {
+        callServerMethod<T = any>(method: string, args?: Record<string, any>): Promise<T>;
+    }
+}
+
+// export const GameProfileSettings: FC = () => {
+//     const [fpsLimit, setFpsLimit] = useState<number>(60);
+
+//     return (
+//         <PanelSection title="Performance Settings">
+//             <PanelSectionRow>
+//                 <SliderField
+//                     label="FPS Limit"
+//                     description="Frame rate limit for the current game"
+//                     min={15}
+//                     max={60}
+//                     step={5}
+//                     value={fpsLimit}
+//                     showValue={true}
+//                     onChange={(val) => {
+//                         setFpsLimit(val);
+//                         window.callServerMethod("save_game_profile", { fps_limit: val });
+//                     }}
+//                 />
+//             </PanelSectionRow>
+//         </PanelSection>
+//     );
+// };
 
 type RunningGame = {
   app_id: string;
@@ -22,17 +53,21 @@ type RunningGame = {
 type GameProfile = {
   tdp_ac: number;
   tdp_battery: number;
+  fps_ac: number;
+  fps_battery: number;
 };
+
 type GameProfiles = Record<string, GameProfile>;
 
 
 const getPowerStatus = callable<[], string>("get_power_status");
 const getTdpLimit = callable<[], number>("get_tdp_limit");
-const setTdpLimit = callable<[number], boolean>("set_tdp_limit");
+// const setTdpLimit = callable<[number], boolean>("set_tdp_limit");
 const getRunningGames = callable<[], RunningGame[]>("get_running_games");
 const getGameProfiles = callable<[], GameProfiles>("get_game_profiles");
+const getAvailableFps = callable<[], number[]>("get_available_fps");
 const saveGameProfile = callable<
-  [string, number, number],
+  [string, number, number, number, number],
   boolean
 >("save_game_profile");
 
@@ -49,6 +84,9 @@ function Content() {
   const [tdpBattery, setTdpBattery] = useState(8);
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
+  const [fpsAc, setFpsAc] = useState(0);
+  const [fpsBattery, setFpsBattery] = useState(0);
+  const [availableFps, setAvailableFps] = useState<number[]>([0]);
 
   useEffect(() => {
     let active = true;
@@ -94,14 +132,30 @@ function Content() {
       }
     };
 
+      const loadAvailableFps = async () => {
+    try {
+      const values = await getAvailableFps();
+      if (active) {
+        setAvailableFps(values);
+      }
+    } catch (error) {
+      if (active) {
+        setProfileError(`Failed to load FPS options: ${String(error)}`);
+      }
+    }
+  };
+
+void loadAvailableFps();
+
     void updatePowerStatus();
     void updateTdpLimit();
     void updateRunningGames();
 
     const timer = window.setInterval(() => {
       void updatePowerStatus();
-      
       void updateRunningGames();
+      void loadAvailableFps();
+
     }, 2000);
 
     return () => {
@@ -128,10 +182,15 @@ function Content() {
 
   void loadProfiles();
 
+
+  
+
   return () => {
     active = false;
   };
   }, []);
+
+  
 
   useEffect(() => {
   if (!selectedGameId) return;
@@ -141,6 +200,9 @@ function Content() {
   setTdpAc(profile?.tdp_ac ?? 15);
   setTdpBattery(profile?.tdp_battery ?? 8);
 
+  setFpsAc(profile?.fps_ac ?? 0);
+  setFpsBattery(profile?.fps_battery ?? 0);
+
   setProfileMessage("");
   setProfileError("");
 }, [selectedGameId, gameProfiles]);
@@ -149,13 +211,20 @@ function Content() {
   if (!selectedGameId) return;
 
   try {
-    await saveGameProfile(selectedGameId, tdpAc, tdpBattery);
-
+    await saveGameProfile(
+      selectedGameId,
+      tdpAc,
+      tdpBattery,
+      fpsAc,
+      fpsBattery
+    );
     setGameProfiles((previous) => ({
       ...previous,
       [selectedGameId]: {
         tdp_ac: tdpAc,
         tdp_battery: tdpBattery,
+        fps_ac: fpsAc,
+        fps_battery: fpsBattery,
       },
     }));
 
@@ -175,11 +244,13 @@ function Content() {
 
   return (
     <PanelSection title="Power Profiles">
+      {/* Power Source Status */}
       <PanelSectionRow>
         <div style={{ padding: "8px 0" }}>
           Power Source: <b>{statusText}</b>
         </div>
       </PanelSectionRow>
+      {/* Running Games List */}
       <PanelSectionRow>
         <div style={{ padding: "8px 0", width: "100%" }}>
           <b>Running Games</b>
@@ -212,7 +283,7 @@ function Content() {
           )}
         </div>
       </PanelSectionRow>
-
+      {/* Game Profile Configuration */}
       <PanelSectionRow>
         <div style={{ padding: "8px 0", width: "100%" }}>
           <b>Game Profile</b>
@@ -237,18 +308,19 @@ function Content() {
 
                   {gameProfiles[game.app_id] && (
                     <div>
-                      AC: {gameProfiles[game.app_id].tdp_ac} Вт ·
-                      Battery: {gameProfiles[game.app_id].tdp_battery} Вт
+                      AC: {gameProfiles[game.app_id].tdp_ac} watts ·
+                      Battery: {gameProfiles[game.app_id].tdp_battery} watts
                     </div>
                   )}
                 </div>
               ))}
 
+              {/* Game Profile Sliders */}
               {selectedGameId && (
-                <>
+                <> {/* Sliders for TDP */}
                   <div style={{ marginTop: "12px" }}>
                     <SliderField
-                      label={`AC: ${tdpAc} Вт`}
+                      label={`AC: ${tdpAc} watts`}
                       value={tdpAc}
                       min={3}
                       max={15}
@@ -263,7 +335,7 @@ function Content() {
 
                   <div style={{ marginTop: "12px" }}>
                     <SliderField
-                      label={`Battery: ${tdpBattery} Вт`}
+                      label={`Battery: ${tdpBattery} watts`}
                       value={tdpBattery}
                       min={3}
                       max={15}
@@ -271,6 +343,38 @@ function Content() {
                       showValue
                       onChange={(value) => {
                         setTdpBattery(Math.round(value));
+                        setProfileMessage("");
+                      }}
+                    />
+                  </div>
+
+                  {/* Sliders for FPS */}
+                  <div style={{ marginTop: "12px" }}>
+                    <SliderField
+                      label={`AC FPS: ${fpsAc === 0 ? "Unlimited" : fpsAc}`}
+                      value={Math.max(0, availableFps.indexOf(fpsAc))}
+                      min={0}
+                      max={Math.max(0, availableFps.length - 1)}
+                      step={1}
+                      showValue={false}
+                      onChange={(index) => {
+                        const next = availableFps[Math.round(index)] ?? 0;
+                        setFpsAc(next);
+                        setProfileMessage("");
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginTop: "12px" }}>
+                    <SliderField
+                      label={`Battery FPS: ${fpsBattery === 0 ? "Unlimited" : fpsBattery}`}
+                      value={Math.max(0, availableFps.indexOf(fpsBattery))}
+                      min={0}
+                      max={Math.max(0, availableFps.length - 1)}
+                      showValue={false}
+                      onChange={(index) => {
+                        const next = availableFps[Math.round(index)] ?? 0;
+                        setFpsBattery(next);
                         setProfileMessage("");
                       }}
                     />
@@ -298,19 +402,20 @@ function Content() {
           )}
         </div>
       </PanelSectionRow>
+      {/* TDP Limit Configuration */}
       <PanelSectionRow>
         <div style={{ padding: "8px 0", width: "100%" }}>
-          <b>Limit TDP: {tdpLimit} Вт</b>
+          <b>Limit TDP: {tdpLimit} watts</b>
 
           {tdpError && (
             <div style={{ whiteSpace: "normal" }}>
               Error: {tdpError}
             </div>
           )}
-
-      <PanelSectionRow>
+      {/* TDP Limit Slider */}
+      {/* <PanelSectionRow>
         <SliderField
-          label={`TDP: ${tdpLimit} Вт`}
+          label={`TDP: ${tdpLimit} watts`}
           value={tdpLimit}
           min={3}
           max={15}
@@ -330,7 +435,7 @@ function Content() {
             }
           }}
         />
-      </PanelSectionRow>
+      </PanelSectionRow> */}
         </div>
       </PanelSectionRow>
     </PanelSection>
