@@ -2,7 +2,8 @@ import {
   PanelSection,
   PanelSectionRow,  
   SliderField,
-  staticClasses
+  staticClasses,
+  ButtonItem
 } from "@decky/ui";
 import {
   addEventListener,
@@ -14,6 +15,8 @@ import {
 import { useEffect, useState} from "react";
 import { FaShip } from "react-icons/fa";
 
+
+
 // Extend Window interface to recognize Decky's backend bridge
 declare global {
     interface Window {
@@ -21,35 +24,13 @@ declare global {
     }
 }
 
-// export const GameProfileSettings: FC = () => {
-//     const [fpsLimit, setFpsLimit] = useState<number>(60);
-
-//     return (
-//         <PanelSection title="Performance Settings">
-//             <PanelSectionRow>
-//                 <SliderField
-//                     label="FPS Limit"
-//                     description="Frame rate limit for the current game"
-//                     min={15}
-//                     max={60}
-//                     step={5}
-//                     value={fpsLimit}
-//                     showValue={true}
-//                     onChange={(val) => {
-//                         setFpsLimit(val);
-//                         window.callServerMethod("save_game_profile", { fps_limit: val });
-//                     }}
-//                 />
-//             </PanelSectionRow>
-//         </PanelSection>
-//     );
-// };
-
 type RunningGame = {
   app_id: string;
   pid: string;
   process: string;
+  name: string | null;
 };
+
 type GameProfile = {
   tdp_ac: number;
   tdp_battery: number;
@@ -75,7 +56,7 @@ const saveGameProfile = callable<
 function Content() {
   const [powerStatus, setPowerStatus] = useState("UNKNOWN");
   const [runningGames, setRunningGames] = useState<RunningGame[]>([]);
-  const [gamesError, setGamesError] = useState("");
+  const [,setGamesError] = useState("");
   const [tdpLimit, setTdpLimitState] = useState(15);
   const [tdpError, setTdpError] = useState("");
   const [gameProfiles, setGameProfiles] = useState<GameProfiles>({});
@@ -256,189 +237,203 @@ void loadAvailableFps();
     !availableFps.includes(fpsAc) ||
     !availableFps.includes(fpsBattery);
 
-  return (
-    <PanelSection title="Power Profiles">
-      {/* Power Source Status */}
-      <PanelSectionRow>
-        <div style={{ padding: "8px 0" }}>
-          Power Source: <b>{statusText}</b>
-        </div>
-      </PanelSectionRow>
-      {/* Running Games List */}
-      <PanelSectionRow>
-        <div style={{ padding: "8px 0", width: "100%" }}>
-          <b>Running Games</b>
+ 
 
-          {gamesError ? (
-            <div style={{ marginTop: "6px", whiteSpace: "normal" }}>
-              Error: {gamesError}
-            </div>
-          ) : runningGames.length === 0 ? (
-            <div style={{ marginTop: "6px" }}>
-              Games not found
-            </div>
-          ) : (
-            runningGames.map((game) => (
-              <div
-                key={`${game.app_id}-${game.pid}`}
-                style={{
-                  marginTop: "8px",
-                  whiteSpace: "normal",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                App ID: <b>{game.app_id}</b>
-                <br />
-                Process: {game.process}
-                <br />
-                PID: {game.pid}
-              </div>
-            ))
-          )}
-        </div>
-      </PanelSectionRow>
-      {/* Game Profile Configuration */}
-      <PanelSectionRow>
-        <div style={{ padding: "8px 0", width: "100%" }}>
-          <b>Game Profile</b>
+return (
+  <PanelSection title="Power Profiles">
+    {/* Power Source Status */}
+    <PanelSectionRow>
+      <div style={{ padding: "8px 0" }}>
+        Power Source: <b>{statusText}</b>
+      </div>
+    </PanelSectionRow>
 
-          {runningGames.length === 0 ? (
-            <div style={{ marginTop: "6px" }}>
-              Start a game to configure its profile.
-            </div>
-          ) : (
-            <>
-              {runningGames.map((game) => (
-                <div
-                  key={game.app_id}
-                  style={{ marginTop: "8px", whiteSpace: "normal" }}
+    {/* Game Profile Configuration */}
+    <PanelSectionRow>
+      <div style={{ padding: "8px 0", width: "100%" }}>
+        <b>Game Profile</b>
+
+        {runningGames.length === 0 ? (
+          <div style={{ marginTop: "6px" }}>
+            Start a game to configure its profile.
+          </div>
+        ) : (
+          <>
+            {/* Running Games */}
+            {runningGames.map((game) => {
+              const isSelected = selectedGameId === game.app_id;
+              return (
+                <div 
+                  key={game.app_id} 
+                  style={{ 
+                    marginTop: "6px",
+                    borderRadius: "4px",
+                    border: isSelected ? "1px solid #66c0f4" : "1px solid rgba(255,255,255,0.15)",
+                    background: isSelected ? "rgba(102,192,244,0.2)" : "rgba(255,255,255,0.05)",
+                  }}
                 >
-                  <button
-                    onClick={() => setSelectedGameId(game.app_id)}
-                  >
-                    {selectedGameId === game.app_id ? "✓ " : ""}
-                    {game.process} (ID: {game.app_id})
-                  </button>
-
-                  {gameProfiles[game.app_id] && (
-                    <div>
-                      AC: {gameProfiles[game.app_id].tdp_ac} watts ·
-                      Battery: {gameProfiles[game.app_id].tdp_battery} watts
-                    </div>
-                  )}
+                <ButtonItem
+                  layout="below"
+                  onClick={() => setSelectedGameId(game.app_id)}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                    <span>
+                      {game.name ? `🎮 ${game.name}` : `⚙️ Global / Unlisted Game (${game.app_id})`}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#8b929a" }}>
+                      {isSelected ? "[Selected ⚙️]" : "Configure ›"}
+                    </span>
+                  </div>
+                </ButtonItem>
                 </div>
-              ))}
+              );
+            })}
 
-              {/* Game Profile Sliders */}
-              {selectedGameId && (
-                <> {/* Sliders for TDP */}
-                  <div style={{ marginTop: "12px" }}>
-                    <SliderField
-                      label={`AC: ${tdpAc} watts`}
-                      value={tdpAc}
-                      min={3}
-                      max={15}
-                      step={1}
-                      showValue
-                      onChange={(value) => {
-                        setTdpAc(Math.round(value));
-                        setProfileMessage("");
-                      }}
-                    />
-                  </div>
+            {/* Selected Game Profile Settings */}
+            {selectedGameId && (
+              <>
+                {/* TDP Sliders */}
+                <div style={{ marginTop: "12px" }}>
+                  <SliderField
+                    label={`AC: ${tdpAc} watts`}
+                    value={tdpAc}
+                    min={3}
+                    max={15}
+                    step={1}
+                    showValue
+                    onChange={(value) => {
+                      setTdpAc(Math.round(value));
+                      setProfileMessage("");
+                    }}
+                  />
+                </div>
 
-                  <div style={{ marginTop: "12px" }}>
-                    <SliderField
-                      label={`Battery: ${tdpBattery} watts`}
-                      value={tdpBattery}
-                      min={3}
-                      max={15}
-                      step={1}
-                      showValue
-                      onChange={(value) => {
-                        setTdpBattery(Math.round(value));
-                        setProfileMessage("");
-                      }}
-                    />
-                  </div>
-                  
+                <div style={{ marginTop: "12px" }}>
+                  <SliderField
+                    label={`Battery: ${tdpBattery} watts`}
+                    value={tdpBattery}
+                    min={3}
+                    max={15}
+                    step={1}
+                    showValue
+                    onChange={(value) => {
+                      setTdpBattery(Math.round(value));
+                      setProfileMessage("");
+                    }}
+                  />
+                </div>
 
-                  {/* Sliders for FPS */}
-                  <div style={{ marginTop: "12px" }}>
-                    <SliderField
-                      label={`AC FPS: ${displayedFpsAc}`}
-                      value={Math.max(0, availableFps.indexOf(displayedFpsAc))}
-                      min={0}
-                      max={Math.max(0, availableFps.length - 1)}
-                      step={1}
-                      showValue={false}
-                      onChange={(index) => {
-                        const next = availableFps[Math.round(index)] ?? 0;
-                        setFpsAc(next);
-                        setProfileMessage("");
-                      }}
-                    />
-                  </div>
+                {/* FPS Sliders */}
+                <div style={{ marginTop: "12px" }}>
+                  <SliderField
+                    label={`AC FPS: ${displayedFpsAc}`}
+                    value={Math.max(
+                      0,
+                      availableFps.indexOf(displayedFpsAc)
+                    )}
+                    min={0}
+                    max={Math.max(0, availableFps.length - 1)}
+                    step={1}
+                    showValue={false}
+                    onChange={(index) => {
+                      const next =
+                        availableFps[Math.round(index)] ?? 0;
+                      setFpsAc(next);
+                      setProfileMessage("");
+                    }}
+                  />
+                </div>
 
-                  <div style={{ marginTop: "12px" }}>
-                    <SliderField
-                      label={`Battery FPS: ${displayedFpsBattery}`}
-                      value={Math.max(0, availableFps.indexOf(displayedFpsBattery))}
-                      min={0}
-                      max={Math.max(0, availableFps.length - 1)}
-                      showValue={false}
-                      onChange={(index) => {
-                        const next = availableFps[Math.round(index)] ?? 0;
-                        setFpsBattery(next);
-                        setProfileMessage("");
-                      }}
-                    />
-                  </div>
+                <div style={{ marginTop: "12px" }}>
+                  <SliderField
+                    label={`Battery FPS: ${displayedFpsBattery}`}
+                    value={Math.max(
+                      0,
+                      availableFps.indexOf(displayedFpsBattery)
+                    )}
+                    min={0}
+                    max={Math.max(0, availableFps.length - 1)}
+                    step={1}
+                    showValue={false}
+                    onChange={(index) => {
+                      const next =
+                        availableFps[Math.round(index)] ?? 0;
+                      setFpsBattery(next);
+                      setProfileMessage("");
+                    }}
+                  />
+                </div>
 
-                  {hasUnsupportedFps && (
-                  <div style={{ marginTop: "8px", color: "#f0ad4e" }}>
-                    FPS limit was reset because the configured FPS is unavailable
-                    on this display. The maximum available FPS is selected.
-                  </div>
-)}
-
-                  <button
-                    style={{ marginTop: "12px" }}
-                    onClick={() => void handleSaveProfile()}
+                {/* FPS Availability Warning */}
+                {hasUnsupportedFps && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      color: "#f0ad4e",
+                      whiteSpace: "normal",
+                    }}
                   >
-                    Save
-                  </button>
+                    Configured FPS is unavailable on this display.
+                    The maximum available FPS is selected.
+                  </div>
+                )}
 
-                  {profileMessage && (
-                    <div>{profileMessage}</div>
-                  )}
+                {/* Save Profile */}
+                <div 
+                  style={{ 
+                    marginTop: "12px",
+                    borderRadius: "4px",
+                    background: "#66c0f4",
+                  }}
+                >
+                <ButtonItem
+                  layout="below"
+                  onClick={() => void handleSaveProfile()}
+                >
+                  <span style={{ color: "#171a21", fontWeight: 600 }}>
+                    💾 Apply Profile Settings
+                  </span>
+                </ButtonItem>
+                </div>
 
-                  {profileError && (
-                    <div style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>
-                      Error profile: {profileError}
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </PanelSectionRow>
-      {/* TDP Limit Configuration */}
-      <PanelSectionRow>
-        <div style={{ padding: "8px 0", width: "100%" }}>
-          <b>Limit TDP: {tdpLimit} watts</b>
+                {profileMessage && (
+                  <div style={{ marginTop: "8px" }}>
+                    {profileMessage}
+                  </div>
+                )}
 
-          {tdpError && (
-            <div style={{ whiteSpace: "normal" }}>
-              Error: {tdpError}
-            </div>
-          )}
-        </div>
-      </PanelSectionRow>
-    </PanelSection>
-    
-  );
+                {profileError && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    Error profile: {profileError}
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </PanelSectionRow>
+
+    {/* Global TDP Limit */}
+    <PanelSectionRow>
+      <div style={{ padding: "8px 0", width: "100%" }}>
+        <b>Limit TDP: {tdpLimit} watts</b>
+
+        {tdpError && (
+          <div style={{ whiteSpace: "normal" }}>
+            Error: {tdpError}
+          </div>
+        )}
+      </div>
+    </PanelSectionRow>
+  </PanelSection>
+);
 }
 
 export default definePlugin(() => {

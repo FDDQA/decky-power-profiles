@@ -1,9 +1,11 @@
 import os
-
 import decky
 import asyncio
 import json
 import re
+from pathlib import Path
+import struct
+
 
 
 class Plugin:
@@ -153,6 +155,7 @@ class Plugin:
             "explorer.exe", "services.exe", "svchost.exe",
         )
 
+        shortcut_names = self.get_steam_shortcut_names()
         for pid in os.listdir("/proc"):
             if not pid.isdigit():
                 continue
@@ -191,6 +194,9 @@ class Plugin:
                         "app_id": app_id,
                         "pid": pid,
                         "process": process_name,
+                        "name": self.get_steam_game_name(app_id) or shortcut_names.get(app_id),
+
+
                     }
 
             except (OSError, ValueError):
@@ -483,3 +489,91 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"FPS apply error: {e}")
             return False
+    def get_steam_game_name(self, app_id: str) -> str | None:
+        steamapps_dirs = [
+            Path.home() / ".steam/steam/steamapps",
+            Path.home() / ".local/share/Steam/steamapps",
+        ]
+
+        for steamapps in steamapps_dirs:
+            manifest = steamapps / f"appmanifest_{app_id}.acf"
+
+            try:
+                content = manifest.read_text(encoding="utf-8")
+            except OSError:
+                continue
+
+            for line in content.splitlines():
+                parts = line.strip().split('"')
+                if len(parts) >= 4 and parts[1] == "name":
+                    return parts[3]
+
+        return None
+
+    def get_steam_shortcut_names(self) -> dict[str, str]:
+        names = {}
+        userdata = Path.home() / ".steam/steam/userdata"
+
+        for shortcuts_file in userdata.glob("*/config/shortcuts.vdf"):
+            try:
+                data = shortcuts_file.read_bytes()
+                pos = 0
+
+                def read_string():
+                    nonlocal pos
+                    end = data.index(b"\0", pos)
+                    value = data[pos:end].decode("utf-8", errors="replace")
+                    pos = end + 1
+                    return value
+
+                def read_object():
+                    nonlocal pos
+                    result = {}
+
+                    while pos < len(data):
+                        kind = data[pos]
+                        pos += 1
+
+                        if kind == 8:
+                            break
+
+                        key = read_string()
+
+                        if kind == 0:
+                            value = read_object()
+                        elif kind == 1:
+                            value = read_string()
+                        elif kind == 2:
+                            value = struct.unpack_from("<i", data, pos)[0]
+                            pos += 4
+                        elif kind == 3:
+                            value = struct.unpack_from("<f", data, pos)[0]
+                            pos += 4
+                        elif kind == 7:
+                            value = struct.unpack_from("<Q", data, pos)[0]
+                            pos += 8
+                        else:
+                            raise ValueError(f"Unsupported VDF type: {kind}")
+
+                        result[key] = value
+
+                    return result
+
+                root = read_object()
+                shortcuts = root.get("shortcuts", {})
+
+                for item in shortcuts.values():
+                    if not isinstance(item, dict):
+                        continue
+
+                    name = item.get("appname")
+                    app_id = item.get("appid")
+
+                    if name and isinstance(app_id, int):
+                        unsigned_id = str(app_id & 0xFFFFFFFF)
+                        names[unsigned_id] = name
+
+            except (OSError, ValueError, IndexError, struct.error):
+                continue
+
+        return names
