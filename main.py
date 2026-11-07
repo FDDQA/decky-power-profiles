@@ -224,40 +224,53 @@ class Plugin:
             return {}
 
     async def save_game_profile(
-        self,
-        app_id: str,
-        tdp_ac: int,
-        tdp_battery: int,
-        fps_ac: int = 0,
-        fps_battery: int = 0,
-    ) -> bool:
-        if not app_id.isdigit() or app_id == "0":
-            raise ValueError("Invalid App ID")
+            self,
+            app_id: str,
+            tdp_ac: int,
+            tdp_battery: int,
+            fps_ac: int = 0,
+            fps_battery: int = 0,
+        ) -> bool:
+            if not app_id.isdigit() or app_id == "0":
+                raise ValueError("Invalid App ID")
 
-        if not 3 <= tdp_ac <= 15 or not 3 <= tdp_battery <= 15:
-            raise ValueError("TDP must be between 3 and 15 W")
-        allowed_fps = (0, 30, 45, 60, 90, 120)
+            if not 3 <= tdp_ac <= 15 or not 3 <= tdp_battery <= 15:
+                raise ValueError("TDP must be between 3 and 15 W")
+            allowed_fps = (0, 30, 45, 60, 90, 120)
 
-        if fps_ac not in allowed_fps or fps_battery not in allowed_fps:
-            raise ValueError(
-                f"Unsupported FPS limit. Allowed values: {allowed_fps}"
-         )
+            if fps_ac not in allowed_fps or fps_battery not in allowed_fps:
+                raise ValueError(
+                    f"Unsupported FPS limit. Allowed values: {allowed_fps}"
+                )
 
-        profiles = await self.get_game_profiles()
-        profiles[app_id] = {
-            "tdp_ac": tdp_ac,
-            "tdp_battery": tdp_battery,
-            "fps_ac": fps_ac,
-            "fps_battery": fps_battery,
-        }
+            profiles = await self.get_game_profiles()
+            profiles[app_id] = {
+                "tdp_ac": tdp_ac,
+                "tdp_battery": tdp_battery,
+                "fps_ac": fps_ac,
+                "fps_battery": fps_battery,
+            }
 
-        path = self._get_profiles_path()
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+            path = self._get_profiles_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(profiles, f, indent=2)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(profiles, f, indent=2)
 
-        return True
+            # Apply limits immediately if this game is currently running
+            running_games = await self.get_running_games()
+            is_running = any(str(g.get("app_id")) == str(app_id) for g in running_games)
+
+            if is_running:
+                power_status = await self.get_power_status()
+                target_tdp = tdp_ac if power_status == "AC" else tdp_battery
+                target_fps = fps_ac if power_status == "AC" else fps_battery
+
+                # Call your actual methods that apply TDP and FPS to the system hardware
+                await self.set_tdp_limit(target_tdp)
+                await self.set_fps_limit(target_fps)
+
+            return True
 
     async def _restore_original_tdp(self):
         original_tdp = getattr(self, "_original_tdp", None)

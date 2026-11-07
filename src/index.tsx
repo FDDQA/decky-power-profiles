@@ -42,8 +42,7 @@ type GameProfiles = Record<string, GameProfile>;
 
 
 const getPowerStatus = callable<[], string>("get_power_status");
-const getTdpLimit = callable<[], number>("get_tdp_limit");
-// const setTdpLimit = callable<[number], boolean>("set_tdp_limit");
+// const getTdpLimit = callable<[], number>("get_tdp_limit");
 const getRunningGames = callable<[], RunningGame[]>("get_running_games");
 const getGameProfiles = callable<[], GameProfiles>("get_game_profiles");
 const getAvailableFps = callable<[], number[]>("get_available_fps");
@@ -57,8 +56,6 @@ function Content() {
   const [powerStatus, setPowerStatus] = useState("UNKNOWN");
   const [runningGames, setRunningGames] = useState<RunningGame[]>([]);
   const [,setGamesError] = useState("");
-  const [tdpLimit, setTdpLimitState] = useState(15);
-  const [tdpError, setTdpError] = useState("");
   const [gameProfiles, setGameProfiles] = useState<GameProfiles>({});
   const [selectedGameId, setSelectedGameId] = useState("");
   const [tdpAc, setTdpAc] = useState(15);
@@ -68,6 +65,7 @@ function Content() {
   const [fpsAc, setFpsAc] = useState(0);
   const [fpsBattery, setFpsBattery] = useState(0);
   const [availableFps, setAvailableFps] = useState<number[]>([0]);
+
 
   useEffect(() => {
     let active = true;
@@ -82,21 +80,7 @@ function Content() {
         console.error("Failed to get power status:", error);
       }
     };
-
-    const updateTdpLimit = async () => {
-    try {
-      const limit = await getTdpLimit();
-      if (active) {
-        setTdpLimitState(limit);
-        setTdpError("");
-      }
-    } catch (error) {
-      console.error("Failed to get TDP limit:", error);
-      if (active) {
-        setTdpError(String(error));
-      }
-    }
-  };
+    
 
     const updateRunningGames = async () => {
       try {
@@ -126,10 +110,8 @@ function Content() {
     }
   };
 
-void loadAvailableFps();
-
+    void loadAvailableFps();
     void updatePowerStatus();
-    void updateTdpLimit();
     void updateRunningGames();
 
     const timer = window.setInterval(() => {
@@ -189,33 +171,33 @@ void loadAvailableFps();
 }, [selectedGameId, gameProfiles]);
 
   const handleSaveProfile = async () => {
-  if (!selectedGameId) return;
+    if (!selectedGameId) return;
 
-  try {
-    await saveGameProfile(
-      selectedGameId,
-      tdpAc,
-      tdpBattery,
-      fpsAc,
-      fpsBattery
-    );
-    setGameProfiles((previous) => ({
-      ...previous,
-      [selectedGameId]: {
-        tdp_ac: tdpAc,
-        tdp_battery: tdpBattery,
-        fps_ac: fpsAc,
-        fps_battery: fpsBattery,
-      },
-    }));
+    try {
+      await saveGameProfile(
+        selectedGameId,
+        tdpAc,
+        tdpBattery,
+        fpsAc,
+        fpsBattery
+      );
+      setGameProfiles((previous) => ({
+        ...previous,
+        [selectedGameId]: {
+          tdp_ac: tdpAc,
+          tdp_battery: tdpBattery,
+          fps_ac: fpsAc,
+          fps_battery: fpsBattery,
+        },
+      }));
 
-    setProfileMessage("Profile saved successfully.");
-    setProfileError("");
-  } catch (error) {
-    setProfileError(String(error));
-    setProfileMessage("");
-  }
-};
+      setProfileMessage("Profile saved successfully.");
+      setProfileError("");
+    } catch (error) {
+      setProfileError(String(error));
+      setProfileMessage("");
+    }
+  };
 
   const statusText = {
     AC: "Connected to power adapter",
@@ -236,6 +218,25 @@ void loadAvailableFps();
   const hasUnsupportedFps =
     !availableFps.includes(fpsAc) ||
     !availableFps.includes(fpsBattery);
+
+    const activeGameId = runningGames[0]?.app_id ?? "";
+  const activeProfile = gameProfiles[activeGameId];
+  const isAc = powerStatus === "AC";
+
+  const defaultTdp = isAc ? 15 : 8;
+  const defaultFps = 0;
+
+  const rawTdp = activeProfile 
+    ? (isAc ? activeProfile.tdp_ac : activeProfile.tdp_battery) 
+    : defaultTdp;
+
+  const rawFps = activeProfile 
+    ? (isAc ? activeProfile.fps_ac : activeProfile.fps_battery) 
+    : defaultFps;
+
+  const isValidFps = rawFps === 0 || availableFps.includes(rawFps);
+  const currentFps = isValidFps ? rawFps : (availableFps[availableFps.length - 1] ?? 0);
+  const currentTdp = rawTdp;
 
  
 
@@ -420,16 +421,15 @@ return (
       </div>
     </PanelSectionRow>
 
-    {/* Global TDP Limit */}
+    {/* Current TDP and FPS Limit */}
     <PanelSectionRow>
-      <div style={{ padding: "8px 0", width: "100%" }}>
-        <b>Limit TDP: {tdpLimit} watts</b>
-
-        {tdpError && (
-          <div style={{ whiteSpace: "normal" }}>
-            Error: {tdpError}
-          </div>
-        )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+        <span>Active Limits:</span>
+        <span style={{ fontWeight: 600 }}>
+          <span style={{ color: "#ffa726" }}>{currentTdp}W TDP</span>
+          <span style={{ color: "#8c9ba5" }}> / </span>
+          <span style={{ color: "#66c0f4" }}>{currentFps === 0 ? "Off" : `${currentFps} FPS`}</span>
+        </span>
       </div>
     </PanelSectionRow>
   </PanelSection>
