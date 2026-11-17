@@ -5,24 +5,11 @@ import {
   staticClasses,
   ButtonItem
 } from "@decky/ui";
-import {
-  addEventListener,
-  removeEventListener,
-  callable,
-  definePlugin,
-  toaster,
-} from "@decky/api"
+import { callable, definePlugin } from "@decky/api";
 import { useEffect, useState} from "react";
-import { FaShip } from "react-icons/fa";
+import { FaBolt } from "react-icons/fa";
 
 
-
-// Extend Window interface to recognize Decky's backend bridge
-declare global {
-    interface Window {
-        callServerMethod<T = any>(method: string, args?: Record<string, any>): Promise<T>;
-    }
-}
 
 type RunningGame = {
   app_id: string;
@@ -42,7 +29,6 @@ type GameProfiles = Record<string, GameProfile>;
 
 
 const getPowerStatus = callable<[], string>("get_power_status");
-// const getTdpLimit = callable<[], number>("get_tdp_limit");
 const getRunningGames = callable<[], RunningGame[]>("get_running_games");
 const getGameProfiles = callable<[], GameProfiles>("get_game_profiles");
 const getAvailableFps = callable<[], number[]>("get_available_fps");
@@ -242,14 +228,12 @@ function Content() {
 
 return (
   <PanelSection title="Power Profiles">
-    {/* Power Source Status */}
     <PanelSectionRow>
       <div style={{ padding: "8px 0" }}>
         Power Source: <b>{statusText}</b>
       </div>
     </PanelSectionRow>
 
-    {/* Game Profile Configuration */}
     <PanelSectionRow>
       <div style={{ padding: "8px 0", width: "100%" }}>
         <b>Game Profile</b>
@@ -260,7 +244,6 @@ return (
           </div>
         ) : (
           <>
-            {/* Running Games */}
             {runningGames.map((game) => {
               const isSelected = selectedGameId === game.app_id;
               return (
@@ -290,10 +273,8 @@ return (
               );
             })}
 
-            {/* Selected Game Profile Settings */}
             {selectedGameId && (
               <>
-                {/* TDP Sliders */}
                 <div style={{ marginTop: "12px" }}>
                   <SliderField
                     label={`AC: ${tdpAc} watts`}
@@ -324,7 +305,6 @@ return (
                   />
                 </div>
 
-                {/* FPS Sliders */}
                 <div style={{ marginTop: "12px" }}>
                   <SliderField
                     label={`AC FPS: ${displayedFpsAc}`}
@@ -365,7 +345,6 @@ return (
                   />
                 </div>
 
-                {/* FPS Availability Warning */}
                 {hasUnsupportedFps && (
                   <div
                     style={{
@@ -379,7 +358,6 @@ return (
                   </div>
                 )}
 
-                {/* Save Profile */}
                 <div 
                   style={{ 
                     marginTop: "12px",
@@ -421,7 +399,6 @@ return (
       </div>
     </PanelSectionRow>
 
-    {/* Current TDP and FPS Limit */}
     <PanelSectionRow>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
         <span>Active Limits:</span>
@@ -436,28 +413,9 @@ return (
 );
 }
 
-export default definePlugin(() => {
-  console.log("Template plugin initializing, this is called once on frontend startup")
-  const listener = addEventListener<[
-    test1: string,
-    test2: boolean,
-    test3: number
-  ]>("timer_event", (test1, test2, test3) => {
-    console.log("Template got timer_event with:", test1, test2, test3)
-    toaster.toast({
-      title: "template got timer_event",
-      body: `${test1}, ${test2}, ${test3}`
-    });
-  });
-
-  return {
-    name: "Decky Power Profiles",
-    titleView: <div className={staticClasses.Title}>Decky Example Plugin</div>,    
-    content: <Content />,
-    icon: <FaShip />,
-    onDismount() {
-      console.log("Unloading")
-      removeEventListener("timer_event", listener);
-    },
-  };
-});
+export default definePlugin(() => ({
+  name: "Decky Power Profiles",
+  titleView: <div className={staticClasses.Title}>Decky Power Profiles</div>,
+  content: <Content />,
+  icon: <FaBolt />,
+}));

@@ -1,0 +1,38 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
+      - run: python3 -m py_compile main.py
+      - name: Package
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p out/decky-power-profiles
+          cp -r dist main.py plugin.json package.json LICENSE README.md assets out/decky-power-profiles/
+          cd out && zip -r decky-power-profiles.zip decky-power-profiles
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/decky-power-profiles.zip

@@ -10,9 +10,10 @@
     "tags": [
       "utility",
       "performance",
-      "steam-deck"
+      "steam-deck",
+      "root"
     ],
     "description": "Automatically switch per-game TDP and FPS profiles depending on AC power or battery status.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "image": "https://raw.githubusercontent.com/FDDQA/decky-power-profiles/main/assets/logo.png"
   }
 }

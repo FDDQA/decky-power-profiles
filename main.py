@@ -6,18 +6,12 @@ import re
 from pathlib import Path
 import struct
 
-
-
 class Plugin:
-    async def add(self, left: int, right: int) -> int:
-        return left + right
-
-    async def long_running(self):
-        await asyncio.sleep(15)
-        await decky.emit("timer_event", "Hello from the backend!", True, 2)
-
     async def _main(self):
-        self.loop = asyncio.get_running_loop()
+        self._original_tdp = None
+        self._active_profile_key = None
+        self._active_fps_key = None
+        self._last_fps_power_status = None
         self._profile_task = asyncio.create_task(
             self._profile_monitor()
         )
@@ -33,28 +27,16 @@ class Plugin:
             except asyncio.CancelledError:
                 pass
 
-        await self._restore_original_tdp()
-        await self._restore_original_fps()
+        try:
+            await self._restore_original_tdp()
+            await self._restore_original_fps()
+        except Exception as e:
+            decky.logger.error(f"Failed to restore limits on unload: {e}")
 
         decky.logger.info("Power Profiles stopped")
 
     async def _uninstall(self):
-        decky.logger.info("Goodbye World!")
-        pass
-
-    async def start_timer(self):
-        self.loop.create_task(self.long_running())
-
-    async def _migration(self):
-        decky.logger.info("Migrating")
-        decky.migrate_logs(os.path.join(decky.DECKY_USER_HOME,
-                                               ".config", "decky-template", "template.log"))
-        decky.migrate_settings(
-            os.path.join(decky.DECKY_HOME, "settings", "template.json"),
-            os.path.join(decky.DECKY_USER_HOME, ".config", "decky-template"))
-        decky.migrate_runtime(
-            os.path.join(decky.DECKY_HOME, "template"),
-            os.path.join(decky.DECKY_USER_HOME, ".local", "share", "decky-template"))
+        decky.logger.info("Power Profiles uninstalled")
 
     async def get_power_status(self) -> str:
         path = "/sys/class/power_supply/ACAD/online"
@@ -120,13 +102,7 @@ class Plugin:
             if any(refresh % fps == 0 for refresh in refresh_rates)
         ]
 
-        result = available_fps
-
-        decky.logger.info(
-            f"[FPS DEBUG] refresh_rates={refresh_rates}, available_fps={result}"
-        )
-
-        return result
+        return available_fps
 
     async def set_tdp_limit(self, limit: int) -> bool:
         if not 3 <= limit <= 15:
@@ -254,8 +230,10 @@ class Plugin:
             path = self._get_profiles_path()
             os.makedirs(os.path.dirname(path), exist_ok=True)
 
-            with open(path, "w", encoding="utf-8") as f:
+            tmp_path = f"{path}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(profiles, f, indent=2)
+            os.replace(tmp_path, path)
 
             # Apply limits immediately if this game is currently running
             running_games = await self.get_running_games()
@@ -266,7 +244,6 @@ class Plugin:
                 target_tdp = tdp_ac if power_status == "AC" else tdp_battery
                 target_fps = fps_ac if power_status == "AC" else fps_battery
 
-                # Call your actual methods that apply TDP and FPS to the system hardware
                 await self.set_tdp_limit(target_tdp)
                 await self.set_fps_limit(target_fps)
 
@@ -291,10 +268,6 @@ class Plugin:
             games = await self.get_running_games()
             power_status = await self.get_power_status()
 
-            decky.logger.info(
-                f"[Profile DEBUG] games={games}, power={power_status}"
-            )
-
             if not games or power_status not in ("AC", "BATTERY"):
                 if self._active_profile_key is not None:
                     await self._restore_original_tdp()
@@ -309,10 +282,6 @@ class Plugin:
 
             profiles = await self.get_game_profiles()
             profile = profiles.get(app_id)
-
-            decky.logger.info(
-                f"[Profile DEBUG] app_id={app_id}, profile={profile}"
-            )
 
             if profile is None:
                 if self._active_profile_key is not None:
@@ -353,7 +322,7 @@ class Plugin:
 
                     await asyncio.sleep(5)
 
-                    # Проверяем, что игра и питание не изменились
+                    # Reapply only if the game and power source are unchanged
                     current_games = await self.get_running_games()
                     current_power_status = await self.get_power_status()
                     current_game_id = (
@@ -418,12 +387,6 @@ class Plugin:
 
 
     async def _profile_monitor(self):
-        self._original_tdp = None
-        self._active_profile_key = None
-        self._active_fps_key = None
-        self._last_fps_power_status = None
-        self._last_fps_attempt_key = None
-
         last_power_status = None
         last_game_id = None
 
@@ -502,10 +465,11 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"FPS apply error: {e}")
             return False
+
     def get_steam_game_name(self, app_id: str) -> str | None:
         steamapps_dirs = [
-            Path.home() / ".steam/steam/steamapps",
-            Path.home() / ".local/share/Steam/steamapps",
+            Path(decky.DECKY_USER_HOME) / ".steam/steam/steamapps",
+            Path(decky.DECKY_USER_HOME) / ".local/share/Steam/steamapps",
         ]
 
         for steamapps in steamapps_dirs:
@@ -525,7 +489,7 @@ class Plugin:
 
     def get_steam_shortcut_names(self) -> dict[str, str]:
         names = {}
-        userdata = Path.home() / ".steam/steam/userdata"
+        userdata = Path(decky.DECKY_USER_HOME) / ".steam/steam/userdata"
 
         for shortcuts_file in userdata.glob("*/config/shortcuts.vdf"):
             try:
